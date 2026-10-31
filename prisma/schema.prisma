@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  slug      String   @unique
+  timeZone  String   @default("Asia/Kolkata")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  meetingTypes MeetingType[]
+  availabilityRules    AvailabilityRule[]
+  availabilityOverrides AvailabilityOverride[]
+  bookings             Booking[]
+}
+model MeetingType {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  duration    Int
+  location    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  hostId   String
+  host     User      @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+}
+
+model AvailabilityRule {
+  id        String   @id @default(cuid())
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  hostId    String
+  host      User     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+}
+
+model AvailabilityOverride {
+  id        String   @id @default(cuid())
+  date      DateTime
+  startTime String?
+  endTime   String?
+  isBlocked Boolean  @default(true)
+  reason    String?
+  hostId    String
+  host      User     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+}
+
+model Booking {
+  id           String        @id @default(cuid())
+  guestName    String
+  guestEmail   String
+  startTime    DateTime
+  endTime      DateTime
+  status       BookingStatus @default(CONFIRMED)
+  notes        String?
+  createdAt    DateTime      @default(now())
+
+  hostId       String
+  meetingTypeId String
+  meetingType  MeetingType   @relation(fields: [meetingTypeId], references: [id], onDelete: Restrict)
+  host         User          @relation(fields: [hostId], references: [id], onDelete: Restrict)
+}
