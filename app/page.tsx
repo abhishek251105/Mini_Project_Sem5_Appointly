@@ -1,16 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
   const [email, setEmail] = useState("");
+  const router = useRouter(); // Add here
 
   return (
     <main className="min-h-screen bg-white text-slate-900">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-        <a href="/" className="text-2xl font-bold tracking-tight">
+        <Link href="/" className="text-2xl font-bold tracking-tight">
           Appointly<span className="text-violet-600">.</span>
-        </a>
+        </Link>
 
         <div className="hidden items-center gap-8 text-sm text-slate-600 md:flex">
           <a href="#features" className="hover:text-violet-600">Features</a>
@@ -49,7 +52,7 @@ export default function Home() {
             id="get-started"
             onSubmit={(event) => {
               event.preventDefault();
-              window.location.href = `/signup?email=${encodeURIComponent(email)}`;
+              router.push(`/signup?email=${encodeURIComponent(email)}`);
             }}
             className="mt-8 flex max-w-md flex-col gap-3 sm:flex-row"
           >
@@ -78,7 +81,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500">YOUR BOOKING PAGE</p>
-              <h2 className="mt-1 text-xl font-bold">Let's meet</h2>
+              <h2 className="mt-1 text-xl font-bold">Let&apos;s meet</h2>
             </div>
             <div className="rounded-xl bg-violet-100 p-3 text-xl">📅</div>
           </div>

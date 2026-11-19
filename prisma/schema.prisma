@@ -8,10 +8,32 @@ datasource db {
 }
 
 enum BookingStatus {
+  PENDING_PAYMENT
   CONFIRMED
   CANCELLED
   COMPLETED
   NO_SHOW
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REQUIRES_REFUND
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+}
+
+enum NotificationType {
+  BOOKING_CONFIRMED_HOST
+  BOOKING_CONFIRMED_GUEST
 }
 
 model User {
@@ -24,19 +46,23 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  meetingTypes MeetingType[]
-  availabilityRules    AvailabilityRule[]
+  meetingTypes          MeetingType[]
+  availabilityRules     AvailabilityRule[]
   availabilityOverrides AvailabilityOverride[]
-  bookings             Booking[]
+  bookings              Booking[]
 }
+
 model MeetingType {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  duration    Int
-  location    String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  duration     Int
+  location     String?
+  priceInPaise Int      @default(0)
+  currency     String   @default("INR")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   hostId   String
   host     User      @relation(fields: [hostId], references: [id], onDelete: Cascade)
@@ -44,12 +70,12 @@ model MeetingType {
 }
 
 model AvailabilityRule {
-  id        String   @id @default(cuid())
+  id        String @id @default(cuid())
   dayOfWeek Int
   startTime String
   endTime   String
   hostId    String
-  host      User     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  host      User   @relation(fields: [hostId], references: [id], onDelete: Cascade)
 }
 
 model AvailabilityOverride {
@@ -64,17 +90,62 @@ model AvailabilityOverride {
 }
 
 model Booking {
-  id           String        @id @default(cuid())
-  guestName    String
-  guestEmail   String
-  startTime    DateTime
-  endTime      DateTime
-  status       BookingStatus @default(CONFIRMED)
-  notes        String?
-  createdAt    DateTime      @default(now())
-
-  hostId       String
+  id            String                @id @default(cuid())
+  guestName     String
+  guestEmail    String
+  startTime     DateTime
+  endTime       DateTime
+  status        BookingStatus         @default(CONFIRMED)
+  notes         String?
+  createdAt     DateTime              @default(now())
+  expiresAt     DateTime?
+  hostId        String
   meetingTypeId String
-  meetingType  MeetingType   @relation(fields: [meetingTypeId], references: [id], onDelete: Restrict)
-  host         User          @relation(fields: [hostId], references: [id], onDelete: Restrict)
+  meetingType   MeetingType           @relation(fields: [meetingTypeId], references: [id], onDelete: Restrict)
+  host          User                  @relation(fields: [hostId], references: [id], onDelete: Restrict)
+  payments      Payment[]
+  notifications BookingNotification[]
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  bookingId String
+  amount    Int
+  currency  String        @default("INR")
+  status    PaymentStatus @default(PENDING)
+
+  razorpayOrderId   String? @unique
+  razorpayPaymentId String? @unique
+  razorpaySignature String?
+
+  refundReason         String?
+  razorpayRefundId     String?   @unique
+  refundedAt           DateTime?
+  refundIdempotencyKey String?   @unique
+  refundRequestedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId])
+}
+
+model BookingNotification {
+  id        String             @id @default(cuid())
+  bookingId String
+  type      NotificationType
+  status    NotificationStatus @default(PENDING)
+  attempts  Int                @default(0)
+  emailId   String?
+  lastError String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  sentAt    DateTime?
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@unique([bookingId, type])
+  @@index([status])
 }
