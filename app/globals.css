@@ -1,26 +1,81 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #0A1214;
+  --foreground: #F0FDFA;
+  --surface-1: #0E1A1D;
+  --surface-2: #132226;
+  --surface-3: #182B30;
+  --accent-seafoam: #2DD4BF;
+  --accent-teal: #14B8A6;
+  --accent-mint: #5EEAD4;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --ease-overshoot: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography Helpers */
+.font-serif {
+  font-family: 'Instrument Serif', Georgia, serif;
+}
+
+.font-sans {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Liquid Glass with Seafoam Tint */
+.liquid-glass {
+  background: rgba(45, 212, 191, 0.025);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(45, 212, 191, 0.12);
+  box-shadow: inset 0 1px 1px 0 rgba(45, 212, 191, 0.08);
+  border-radius: 24px;
+}
+
+.liquid-glass-card {
+  background: rgba(14, 26, 29, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(45, 212, 191, 0.14);
+  box-shadow: inset 0 1px 1px 0 rgba(45, 212, 191, 0.1), 0 24px 48px -12px rgba(2, 15, 17, 0.6);
+  border-radius: 24px;
+}
+
+.liquid-glass-input {
+  background: rgba(14, 26, 29, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(45, 212, 191, 0.15);
+  border-radius: 16px;
+  color: #F0FDFA;
+  transition: all 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.liquid-glass-input:focus {
+  outline: none;
+  border-color: rgba(45, 212, 191, 0.5);
+  background: rgba(19, 34, 38, 0.85);
+  box-shadow: 0 0 20px rgba(45, 212, 191, 0.15);
+}
+
+/* Fluid Transitions */
+.transition-fluid {
+  transition-property: all;
+  transition-duration: 400ms;
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Seafoam Glow Filter */
+.glow-seafoam {
+  filter: drop-shadow(0 0 14px rgba(45, 212, 191, 0.35));
 }
