@@ -11,15 +11,12 @@ import {
   Clock,
   CreditCard,
   MapPin,
-  Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
   ArrowLeft,
-  CheckCircle,
   AlertCircle,
   User,
   Mail,
-  FileText,
 } from "lucide-react";
 
 interface Slot {
@@ -77,6 +74,10 @@ export default function MeetingBookingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Razorpay SDK readiness state
+  const [sdkReady, setSdkReady] = useState(false);
+  const [sdkFailed, setSdkFailed] = useState(false);
+
   // Fetch host data
   useEffect(() => {
     if (!slug) return;
@@ -94,26 +95,46 @@ export default function MeetingBookingPage() {
     return host?.meetingTypes.find((m) => m.id === meetingTypeId);
   }, [host, meetingTypeId]);
 
+  const handleDateSelect = (dayStr: string) => {
+    setSelectedDate(dayStr);
+    setSelectedSlot(null);
+    setErrorMsg("");
+    setLoadingSlots(true);
+  };
+
   // Fetch slots whenever selectedDate or meetingTypeId changes
   useEffect(() => {
     if (!slug || !meetingTypeId || !selectedDate) return;
-    setLoadingSlots(true);
-    setSelectedSlot(null);
-    setErrorMsg("");
+
+    let ignore = false;
 
     fetch(
       `/api/public/host/${slug}/availability?meetingTypeId=${meetingTypeId}&date=${selectedDate}`
     )
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && Array.isArray(data.availableSlots)) {
-          setSlots(data.availableSlots);
-        } else {
+        if (!ignore) {
+          if (data.success && Array.isArray(data.availableSlots)) {
+            setSlots(data.availableSlots);
+          } else {
+            setSlots([]);
+          }
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
           setSlots([]);
         }
       })
-      .catch(() => setSlots([]))
-      .finally(() => setLoadingSlots(false));
+      .finally(() => {
+        if (!ignore) {
+          setLoadingSlots(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, [slug, meetingTypeId, selectedDate]);
 
   // Calendar generation helpers
@@ -137,6 +158,20 @@ export default function MeetingBookingPage() {
     if (!selectedSlot) {
       setErrorMsg("Please select an available time slot.");
       return;
+    }
+
+    const isPaid = (meetingType?.priceInPaise ?? 0) > 0;
+
+    // Check Razorpay SDK readiness BEFORE reserving slot for paid appointments
+    if (isPaid) {
+      if (sdkFailed) {
+        setErrorMsg("Payment checkout failed to load. Please check your connection or disable ad-blockers, then refresh.");
+        return;
+      }
+      if (!sdkReady && (typeof window === "undefined" || !window.Razorpay)) {
+        setErrorMsg("Payment checkout is still initializing. Please wait a few seconds and try again.");
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -213,26 +248,49 @@ export default function MeetingBookingPage() {
         theme: {
           color: "#0F766E",
         },
+        modal: {
+          ondismiss: function () {
+            setSubmitting(false);
+            setErrorMsg("Checkout was cancelled. Your slot hold remains active for 15 minutes — you can complete payment anytime.");
+          },
+          escape: true,
+          backdropclose: false,
+        },
         handler: async function (response: {
           razorpay_order_id: string;
           razorpay_payment_id: string;
           razorpay_signature: string;
         }) {
           // 4. Verify payment
-          const verifyRes = await fetch("/api/payments/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(response),
-          });
+          try {
+            const verifyRes = await fetch("/api/payments/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(response),
+            });
 
-          const verifyData = await verifyRes.json();
-          if (verifyRes.ok && verifyData.success) {
-            router.push(`/booking/${booking.id}/confirmed`);
-          } else {
-            setErrorMsg("Payment verification failed. Please contact support.");
+            const verifyData = await verifyRes.json();
+            if (verifyRes.ok && verifyData.success) {
+              router.push(`/booking/${booking.id}/confirmed`);
+            } else {
+              setErrorMsg(verifyData.message || "Payment verification failed. Please contact support.");
+              setSubmitting(false);
+            }
+          } catch {
+            setErrorMsg("Network error verifying payment. Please refresh or contact support.");
             setSubmitting(false);
           }
         },
+      });
+
+      // Handle payment failure event from Razorpay (card decline, 3DS failure, etc.)
+      rzp.on("payment.failed", function (response: unknown) {
+        setSubmitting(false);
+        const errObj = response as { error?: { description?: string } } | undefined;
+        const description =
+          errObj?.error?.description ||
+          "Payment was declined or failed. Please try again with another payment method.";
+        setErrorMsg(description);
       });
 
       rzp.open();
@@ -267,7 +325,12 @@ export default function MeetingBookingPage() {
   return (
     <div className="min-h-screen bg-[#0A1214] text-[#F0FDFA] selection:bg-teal-500/30 selection:text-teal-200 pb-24">
       {/* Razorpay Checkout Script */}
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
+      <Script
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        strategy="afterInteractive"
+        onLoad={() => setSdkReady(true)}
+        onError={() => setSdkFailed(true)}
+      />
 
       {/* Header */}
       <header className="border-b border-teal-500/15 bg-[#0A1214]/85 backdrop-blur-md px-6 py-5 md:px-16">
@@ -386,7 +449,7 @@ export default function MeetingBookingPage() {
                         <button
                           key={dayStr}
                           disabled={isPast}
-                          onClick={() => setSelectedDate(dayStr)}
+                          onClick={() => handleDateSelect(dayStr)}
                           className={`aspect-square rounded-xl text-xs font-medium transition-all duration-300 flex items-center justify-center cursor-pointer ${
                             isSelected
                               ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-teal-950 font-bold"

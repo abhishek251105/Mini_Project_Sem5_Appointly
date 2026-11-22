@@ -4,6 +4,7 @@ import { z } from "zod";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import prisma from "@/lib/prisma";
 import { sendBookingConfirmationEmails } from "@/lib/booking-notifications";
+import { checkRateLimit, extractIp } from "@/lib/rate-limit";
 
 const bookingSchema = z.object({
   hostSlug: z.string().min(1),
@@ -16,6 +17,28 @@ const bookingSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    // 1. IP-based rate limiting (shared across all instances)
+    const clientIp = extractIp(request);
+    const ipLimit = await checkRateLimit(`booking:ip:${clientIp}`, {
+      limit: 15,
+      windowMs: 5 * 60 * 1000, // 15 requests per 5 minutes
+    });
+
+    if (!ipLimit.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Too many booking requests from this network. Please wait a few minutes before trying again.",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(ipLimit.retryAfterSeconds),
+          },
+        }
+      );
+    }
+
     const body = await request.json();
     const validation = bookingSchema.safeParse(body);
 
@@ -37,6 +60,27 @@ export async function POST(request: Request) {
       startTime,
       notes,
     } = validation.data;
+
+    // 2. Email-based rate limiting to prevent spamming slots with a single email
+    const emailLimit = await checkRateLimit(`booking:email:${guestEmail}`, {
+      limit: 5,
+      windowMs: 5 * 60 * 1000, // 5 requests per 5 minutes
+    });
+
+    if (!emailLimit.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Too many booking requests for this email address. Please wait a few minutes before trying again.",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(emailLimit.retryAfterSeconds),
+          },
+        }
+      );
+    }
 
     const requestedStart = new Date(startTime);
 

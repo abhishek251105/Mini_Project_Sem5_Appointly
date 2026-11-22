@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { LiquidCard } from "@/components/ui/liquid-card";
 import { LiquidButton } from "@/components/ui/liquid-button";
 import { formatPrice, formatDuration } from "@/lib/utils";
-import { Clock, CreditCard, MapPin, Globe, ArrowRight, Share2, Check } from "lucide-react";
+import { Clock, MapPin, Globe, ArrowRight, Share2, Check } from "lucide-react";
 
 interface PublicHost {
   name: string;

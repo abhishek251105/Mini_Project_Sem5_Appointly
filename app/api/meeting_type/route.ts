@@ -9,7 +9,14 @@ const meetingTypeSchema = z.object({
   description: z.string().optional(),
   duration: z.number().int().positive(),
   location: z.string().optional(),
-  priceInPaise: z.number().int().nonnegative().default(0),
+  priceInPaise: z
+    .number()
+    .int()
+    .refine(
+      (val) => val === 0 || val >= 100,
+      "Price must be either 0 (free) or at least 100 paise (₹1.00)"
+    )
+    .default(0),
 });
 
 export async function POST(request: Request) {

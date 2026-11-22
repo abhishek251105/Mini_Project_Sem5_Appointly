@@ -1,13 +1,14 @@
-
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { sendBookingRescheduledEmail } from "@/lib/booking-notifications";
 
 // 1. Validate rescheduling request
 const rescheduleSchema = z.object({
   newStartTime: z.iso.datetime(),
+  reason: z.string().trim().max(500).optional(),
 });
 
 export async function PATCH(
@@ -29,7 +30,7 @@ export async function PATCH(
     const { id } = await params;
 
     // 4. Validate request body
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
     const validation = rescheduleSchema.safeParse(body);
 
     if (!validation.success) {
@@ -68,11 +69,15 @@ export async function PATCH(
           include: {
             meetingType: {
               select: {
+                title: true,
                 duration: true,
+                location: true,
               },
             },
             host: {
               select: {
+                name: true,
+                slug: true,
                 timeZone: true,
               },
             },
@@ -86,6 +91,11 @@ export async function PATCH(
         // Only confirmed appointments can be rescheduled
         if (booking.status !== "CONFIRMED") {
           return { error: "BOOKING_NOT_RESCHEDULABLE" };
+        }
+
+        // Check if the requested time is identical to the current time
+        if (booking.startTime.getTime() === requestedStart.getTime()) {
+          return { error: "SAME_SLOT" };
         }
 
         // Calculate new appointment end time
@@ -102,7 +112,6 @@ export async function PATCH(
           booking.host.timeZone,
           "yyyy-MM-dd"
         );
-
 
         const dayOfWeek = new Date(
           `${localDate}T00:00:00.000Z`
@@ -258,6 +267,8 @@ export async function PATCH(
           return { error: "SLOT_ALREADY_BOOKED" };
         }
 
+        const previousStartTime = booking.startTime;
+
         // Update the existing booking
         const updatedBooking = await tx.booking.update({
           where: { id },
@@ -267,7 +278,10 @@ export async function PATCH(
           },
         });
 
-        return { booking: updatedBooking };
+        return {
+          booking: updatedBooking,
+          previousStartTime,
+        };
       },
       {
         isolationLevel: "Serializable",
@@ -288,6 +302,10 @@ export async function PATCH(
           message: "Only confirmed bookings can be rescheduled",
           status: 409,
         },
+        SAME_SLOT: {
+          message: "Appointment is already scheduled for this time",
+          status: 400,
+        },
         DATE_UNAVAILABLE: {
           message: "The host is unavailable on this date",
           status: 409,
@@ -306,32 +324,46 @@ export async function PATCH(
         },
       };
 
-      
-const response = result.error
-  ? responses[result.error]
-  : undefined;
+      const response = result.error
+        ? responses[result.error]
+        : undefined;
 
-if (!response) {
-  return NextResponse.json(
-    {
-      success: false,
-      message: "Unable to reschedule booking",
-    },
-    { status: 500 }
-  );
-}
+      if (!response) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Unable to reschedule booking",
+          },
+          { status: 500 }
+        );
+      }
 
-return NextResponse.json(
-  {
-    success: false,
-    message: response.message,
-  },
-  { status: response.status }
-);
-
+      return NextResponse.json(
+        {
+          success: false,
+          message: response.message,
+        },
+        { status: response.status }
+      );
     }
 
-    // 7. Return updated booking
+    // 7. Send reschedule notification email to the guest.
+    //    Email failure must NEVER roll back the rescheduling or crash the response.
+    try {
+      await sendBookingRescheduledEmail({
+        bookingId: id,
+        previousStartTime: result.previousStartTime,
+        reason: validation.data.reason,
+      });
+    } catch (notificationError) {
+      console.error(
+        "Booking reschedule notification error:",
+        id,
+        notificationError
+      );
+    }
+
+    // 8. Return updated booking
     return NextResponse.json(
       {
         success: true,

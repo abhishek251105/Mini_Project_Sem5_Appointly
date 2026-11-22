@@ -14,7 +14,6 @@ import {
   Bell,
   ArrowRight,
   Clock,
-  Sparkles,
   Check,
 } from "lucide-react";
 

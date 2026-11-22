@@ -12,7 +12,7 @@ function SignupForm() {
   const searchParams = useSearchParams();
   const initialSlug = searchParams.get("slug") || "";
 
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initialSlug);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");

@@ -9,7 +9,14 @@ const updateMeetingTypeSchema = z.object({
   description: z.string().nullable().optional(),
   duration: z.number().int().positive().optional(),
   location: z.string().nullable().optional(),
-  priceInPaise: z.number().int().nonnegative().optional(),
+  priceInPaise: z
+    .number()
+    .int()
+    .refine(
+      (val) => val === 0 || val >= 100,
+      "Price must be either 0 (free) or at least 100 paise (₹1.00)"
+    )
+    .optional(),
   isActive: z.boolean().optional(),
 }).refine((data) => Object.keys(data).length > 0, {
   message: "At least one field is required",

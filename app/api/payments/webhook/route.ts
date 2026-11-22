@@ -221,6 +221,21 @@ export async function POST(request: Request) {
         });
       }
 
+      // A definitively failed refund — log it prominently for the host to action.
+      if (result.status === "REFUND_FAILED") {
+        console.error(
+          "Razorpay refund FAILED — manual intervention required:",
+          payment.id,
+          result
+        );
+        return NextResponse.json({
+          success: true,
+          message: "Refund was rejected by Razorpay and requires manual intervention",
+          paymentStatus: "REFUND_FAILED",
+          refundId: result.refundId,
+        });
+      }
+
       console.warn(
         "Refund requires manual reconciliation:",
         payment.id,

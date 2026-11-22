@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { LiquidCard } from "@/components/ui/liquid-card";
 import { LiquidButton } from "@/components/ui/liquid-button";
-import { formatPrice, formatDuration } from "@/lib/utils";
-import { CheckCircle, Calendar, Clock, MapPin, User, ArrowRight, ExternalLink } from "lucide-react";
+import { formatPrice } from "@/lib/utils";
+import { CheckCircle, Calendar, Clock, MapPin, User } from "lucide-react";
 
 interface BookingRecap {
   id: string;
@@ -62,6 +62,14 @@ export default function BookingConfirmedPage() {
 
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startIso}/${endIso}&details=${details}&location=${location}`;
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0A1214] text-[#F0FDFA] flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-400 border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0A1214] text-[#F0FDFA] selection:bg-teal-500/30 selection:text-teal-200 flex flex-col justify-between">
